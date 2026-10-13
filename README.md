@@ -145,6 +145,15 @@ The dev container includes a Redis server, which is used by the `agent_history_r
     [the hosted Work IQ toolbox agent](#enable-the-hosted-work-iq-toolbox-agent).
     You can also set any of these later and re-run `azd provision`.
 
+    The Fabric scripts build portal links from `https://app.fabric.microsoft.com`. If your tenant uses a
+    different Fabric host, set it in the same way, before you provision:
+
+    ```shell
+    azd env set FABRIC_PORTAL_BASE_URL https://<your-fabric-host>
+    ```
+
+    This only affects the links that are printed and written to `.env`, not which resources are created.
+
 4. Provision the Azure resources:
 
     ```shell
@@ -339,6 +348,29 @@ Endpoint notebooks, which skip the knowledge base and call a service endpoint di
 | `workiq-a2a.ipynb` | Delegates a task to the Work IQ Relay Agent over A2A |
 | `workiq-mcp.ipynb` | Consumes Work IQ as a tool through its MCP server |
 | `workiq-tools-actions.ipynb` | The full Work IQ MCP tool catalog and its resource-path model |
+
+### Configure local MCP servers
+
+The repository includes a `.mcp.json` file that registers the Fabric IQ ontology MCP server for local tool discovery. The checked-in URL uses placeholder values for the workspace and ontology IDs. After provisioning, replace the placeholder URL with the value written to your local `.env` file.
+
+On macOS or Linux, use the values from `.env` to replace the placeholders in `.mcp.json` in place:
+
+```bash
+WORKSPACE_ID=$(grep '^FABRIC_WORKSPACE_ID=' .env | sed "s/^FABRIC_WORKSPACE_ID='\(.*\)'/\1/")
+ONTOLOGY_ID=$(grep '^FABRIC_ONTOLOGY_ID=' .env | sed "s/^FABRIC_ONTOLOGY_ID='\(.*\)'/\1/")
+sed -i '' "s/{FABRIC_WORKSPACE_ID}/${WORKSPACE_ID}/g" .mcp.json
+sed -i '' "s/{FABRIC_ONTOLOGY_ID}/${ONTOLOGY_ID}/g" .mcp.json
+```
+
+On Windows, use PowerShell to read `.env` and rewrite `.mcp.json`:
+
+```powershell
+$workspaceId = (Get-Content .env | Where-Object { $_ -match "^FABRIC_WORKSPACE_ID='(.+)'" } | ForEach-Object { $matches[1] })
+$ontologyId = (Get-Content .env | Where-Object { $_ -match "^FABRIC_ONTOLOGY_ID='(.+)'" } | ForEach-Object { $matches[1] })
+$mcpJson = Get-Content .mcp.json | ConvertFrom-Json
+$mcpJson.mcpServers."fabric-iq-ontology".url = "https://api.fabric.microsoft.com/v1/mcp/dataPlane/workspaces/$workspaceId/items/$ontologyId/ontologyEndpoint"
+$mcpJson | ConvertTo-Json -Depth 4 | Set-Content .mcp.json
+```
 
 When you run a notebook, select the `.venv/bin/python` virtual environment.
 
